@@ -5,10 +5,12 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
+import java.util.concurrent.*;
+
 /*
 0 - is no file
 1 - file is add
@@ -19,16 +21,17 @@ import java.util.stream.Collectors;
 
 public class Main implements Serializable {
     static String[] files = new String[11];
-    private static String value;
-    public String file;
-
     public static boolean isFileTreeExist = false;
 
-    public static String filePATH = System.getProperty("user.dir") + File.separator + "File server" + File.separator + "task" +
-            File.separator + "src" + File.separator + "server" + File.separator + "data" + File.separator;
+//    public static String testPath = File.separator + "File server" + File.separator + "task" + File.separator;
+    public static String testPath = File.separator;
 
-    public static String userPATH = System.getProperty("user.dir") + File.separator + "File server" + File.separator + "task" +
-            File.separator + "src" + File.separator + "client" + File.separator + "data" + File.separator;
+
+    public static String filePATH = System.getProperty("user.dir") + testPath + "src" + File.separator + "server" + File.separator + "data" + File.separator;
+
+    public static String serverPATH = System.getProperty("user.dir") + testPath + "src" + File.separator + "server" + File.separator + "table.txt";
+
+    public static String userPATH = System.getProperty("user.dir") + testPath + "src" + File.separator + "client" + File.separator + "data" + File.separator;
 
     public static void serialize(Object obj, String fileName) throws IOException {
         FileOutputStream fos = new FileOutputStream(fileName);
@@ -51,75 +54,16 @@ public class Main implements Serializable {
     }
 
 
-    private static void addFile(String[] next, String name) {
-        int index = 15;
-
-        try {
-            index = Integer.parseInt(next[1]);
-        } catch (NumberFormatException e) {
-//            System.out.format("Cannot add the file %s\n", name);
-        }
-
-        if (index < files.length) {
-            if (files[index] == ("add")) {
-                System.out.format("Cannot add the file %s\n", name);
-            } else {
-                files[index] = "add";
-                System.out.format("The file %s added successfully\n", name);
-            }
-        } else {
-            System.out.format("Cannot add the file %s\n", name);
-        }
-    }
-
-    private static void getFile(String[] gettingFile, String name) {
-        int index = Integer.parseInt(gettingFile[1]);
-        if (index < files.length) {
-            if (files[index] == "add") {
-                System.out.format("The file %s was sent\n", name);
-            } else {
-                System.out.format("The file %s not found\n", name);
-            }
-
-        } else {
-            System.out.format("The file %s not found\n", name);
-        }
-    }
-
-    private static void deleteFile(String[] delete, String name) {
-        int index = Integer.parseInt(delete[1]);
-        if (index <= files.length - 1) {
-            if (files[index] == "add") {
-                files[index] = null;
-                System.out.format("The file %s was deleted\n", name);
-            } else {
-                System.out.format("The file %s not found\n", name);
-            }
-        } else {
-            System.out.format("The file %s not found\n", name);
-        }
-
-    }
-
-    public static String[] readFile(String method, String value) {
-        String input = new Scanner(System.in).nextLine();
-        String[] input2 = input.split(" ");
-
-        return input2;
-
-    }
-
     private static final String SERVER_ADDRESS = "127.0.0.1";
     private static final int SERVER_PORT = 23456;
 
     public static String deleteRequest(String request, TreeMap<Integer, String> fileTreeMap) {
 
         String[] pathFile = request.split(" ");
-        String f_path = null;
-        String serverPath = null;
-        String result = "404";
-        String fileName = null;
-        Integer fileID = null;
+        String serverPath;
+        String result;
+        String fileName;
+        Integer fileID;
 
         if (pathFile[1].equals("BY_ID")) {
             if (fileTreeMap.containsKey(Integer.valueOf(pathFile[2]))) {
@@ -137,7 +81,6 @@ public class Main implements Serializable {
             }
         }
 
-        f_path = userPATH.concat(fileName);
         serverPath = filePATH.concat(fileName);
 
         try {
@@ -160,18 +103,17 @@ public class Main implements Serializable {
 
     public static String putRequest(String request, String information, TreeMap<Integer, String> fileTreeMap) {
         //"PUT BY_ID 23" GET BY_NAME filename.txt
-
         String[] pathFile = request.split(" ");
-        String f_path = "";
-        String serverPath;
-// TODO: починить таблицу, для храненния ид и только имени файла.
-// User path of file
-        if (pathFile[2].equals("BY_ID")) {
-            f_path = userPATH.concat(getFileFromID((pathFile[1]), fileTreeMap));
-            serverPath = filePATH.concat(getFileFromID((pathFile[1]), fileTreeMap));
-        } else {
+        String f_path = null;
+        String serverPath = null;
+        if (pathFile[2].equals("NO_ID")) {
             f_path = userPATH.concat(pathFile[1]);
             serverPath = filePATH.concat(pathFile[1]);
+        }
+        if (pathFile[2].contains(".")) {
+
+            f_path = userPATH.concat(pathFile[1]);
+            serverPath = filePATH.concat(pathFile[2]);
         }
 
         String result = "403";
@@ -179,13 +121,18 @@ public class Main implements Serializable {
         try {
             if (copyFileUsingStream(new File(f_path), new File(serverPath))) {
 
+                Integer hashCODE = null;
                 if (pathFile[2].equals("NO_ID")) {
                     fileTreeMap.put(hCode((pathFile[1])), pathFile[1]);
-                } else {
-                    fileTreeMap.put(Integer.valueOf(pathFile[2]), pathFile[1]);
+                    hashCODE = hCode(pathFile[1]);
+                }
+                if (pathFile[2].contains(".")) {
+                    fileTreeMap.put(hCode(pathFile[2]), pathFile[2]);
+                    hashCODE = hCode(pathFile[2]);
                 }
 
-                result = "200";
+
+                result = "200 " + hashCODE;
             } else {
                 result = "403";
             }
@@ -220,28 +167,12 @@ public class Main implements Serializable {
             serverPath = filePATH.concat(pathFile[2]);
             buf = pathFile[2];
         }
-
         String result = "404";
 
-
-       /* try {
-            FileReader reader = new FileReader(file);
-            Scanner scan = new Scanner(reader);
-
-            while (scan.hasNextLine()) {
-                buf = buf + scan.nextLine();
-            }
-            result = "200";
-            scan.close();
-            reader.close();
-        } catch (IOException e) {
-//            e.printStackTrace();
-            result = "404";
-        }
-*/
         try {
-            copyFileUsingStream(new File(serverPath), new File(f_path));
-            result = "200";
+            if (copyFileUsingStream(new File(serverPath), new File(f_path))) {
+                result = "200";
+            }
         } catch (Exception e) {
 //            e.printStackTrace();
             result = "404";
@@ -252,9 +183,10 @@ public class Main implements Serializable {
     }
 
     private static String getFileFromID(String s, TreeMap<Integer, String> fileTreeMap) {
-
-        return (String) fileTreeMap.get(Integer.valueOf(s));
-
+if (fileTreeMap.containsKey(Integer.valueOf(s))) {
+    return (String) fileTreeMap.get(Integer.valueOf(s));
+}
+return "NONE";
     }
 
     public static Integer getKeysByValue(TreeMap<Integer, String> map, String value) {
@@ -288,7 +220,11 @@ public class Main implements Serializable {
                 os.write(buffer, 0, length);
                 result = true;
             }
-        } finally {
+        } catch (IOException e) {
+//            e.printStackTrace();
+            result = false;
+        }
+        finally {
             is.close();
             os.close();
         }
@@ -299,64 +235,36 @@ public class Main implements Serializable {
         byte[] message = answer.getBytes(StandardCharsets.UTF_8);
         output.writeInt(message.length);
         output.write(message);
-
+//        System.out.println("Answer= "+ answer + "   request= "+ message);
         System.out.println("The request was sent.");
     }
 
     public static int hCode(String files) {
-          /* Date date = new Date();
-            //This method returns the time in millis
-            long timeMilli = date.getTime();
-
-            return (int) timeMilli %100;*/
         return Math.abs(files.hashCode() % 100);
-    }
-
-    private static void generateID(TreeMap fileTreeMap) {
-        File dir = new File(userPATH); //path указывает на директорию
-        File[] arrFiles = dir.listFiles();
-        String[] strFiles = (String[]) Arrays.stream(arrFiles).toArray();
-
-        for (var files : strFiles) {
-            fileTreeMap.put(hCode(files), files);
-
-        }
-        fileTreeMap.forEach((x, y) -> {
-            System.out.println(x + "=" + y);
-        });
-
-        try {
-            saveFile(fileTreeMap);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
     }
 
     public static void saveFile(TreeMap<Integer, String> members)
             throws IOException {
-        try (ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream(filePATH + File.separator + "table.txt"))) {
+        try (ObjectOutputStream os = new ObjectOutputStream(
+                new FileOutputStream(serverPATH))) {
             os.writeObject(members);
         }
     }
 
     public static TreeMap<Integer, String> readFile()
             throws ClassNotFoundException, IOException {
-        try (ObjectInputStream is = new ObjectInputStream(new FileInputStream(filePATH + File.separator + "table.txt"))) {
+        try (ObjectInputStream is = new ObjectInputStream(
+                new FileInputStream(serverPATH))) {
             return (TreeMap<Integer, String>) is.readObject();
         }
     }
 
     public static void print(TreeMap<Integer, String> fileTreeMap) {
-        fileTreeMap.entrySet().forEach(entry -> {
-            Integer x = entry.getKey();
-            String y = entry.getValue();
-            System.out.println(x + "=" + y);
-        });
+        fileTreeMap.forEach((x, y) -> System.out.println(x + "=" + y));
     }
 
     public static void updateMap(TreeMap<Integer, String> fileTreeMap) throws IOException, ClassNotFoundException {
-        File file = new File(filePATH + File.separator + "table.txt");
+        File file = new File(serverPATH);
 
         isFileTreeExist = file.exists();
 
@@ -366,35 +274,50 @@ public class Main implements Serializable {
         } else {
             saveFile(fileTreeMap);
         }
+        Set<Map.Entry<Integer, String> > entries
+                = fileTreeMap.entrySet();
+        entries.forEach(entry ->{
+            String value = entry.getValue();
+            Path valuePath = Paths.get(filePATH+value);
+
+            if (!Files.exists(valuePath)){
+                try {
+                    copyFileUsingStream(new File(userPATH + value), new File(String.valueOf(valuePath.toFile())));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+        });
+
+
     }
 
-    public static void serverLogic(DataInputStream input,
-                                   DataOutputStream output,
-                                   TreeMap<Integer, String> fileTreeMap,
-                                   ServerSocket server) throws IOException {
-        byte[] taskCode = inputRead(input);
-
-        String inputMessage = new String(taskCode, StandardCharsets.UTF_8);
+    public static String serverLogic(TreeMap<Integer, String> fileTreeMap,
+                                     ServerSocket server, String inputMessage) throws IOException {
+        String information = null;
         if (inputMessage.contains("GET")) {
-            print(fileTreeMap);
-            sentRequest(getRequest(inputMessage, fileTreeMap), output);
+//            print(fileTreeMap);
+            information = getRequest(inputMessage, fileTreeMap);
         }
 
         if (inputMessage.contains("PUT")) {
-            print(fileTreeMap);
-            sentRequest(putRequest(inputMessage, inputMessage, fileTreeMap), output);
+            information = putRequest(inputMessage, inputMessage, fileTreeMap);
+//            System.out.println(information);
             saveFile(fileTreeMap);
         }
 
         if (inputMessage.contains("DELETE")) {
-            sentRequest(deleteRequest(inputMessage, fileTreeMap), output);
-            print(fileTreeMap);
+            information = deleteRequest(inputMessage, fileTreeMap);
+//            print(fileTreeMap);
             saveFile(fileTreeMap);
         }
 
         if (inputMessage.contains("exit")) {
             server.close();
         }
+
+        return information;
     }
 
     public static void main(String[] args) {
@@ -402,39 +325,43 @@ public class Main implements Serializable {
         TreeMap<Integer, String> fileTreeMap = new TreeMap<>();
 //        generateID(fileTreeMap);
 
-        ExecutorService executor = Executors.newFixedThreadPool(5);
 
         try (ServerSocket server = new ServerSocket(SERVER_PORT, 50, InetAddress.getByName(SERVER_ADDRESS))
         ) {
 
-
             while (true) {
+                ExecutorService executor = Executors.newSingleThreadExecutor();
                 try (
                         Socket socket = server.accept(); // accepting a new client
                         DataInputStream input = new DataInputStream(socket.getInputStream());
-                        DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+                        DataOutputStream output = new DataOutputStream(socket.getOutputStream())
+
                 ) {
                     updateMap(fileTreeMap);
-                    executor.submit(() -> {
-                                try {
-                                    serverLogic(input, output, fileTreeMap, server);
-                                } catch (IOException e) {
-                                    e.printStackTrace();
-                                } finally {
-                                    executor.shutdown();
-                                }
-                            }
-                    );
 
+                    byte[] taskCode = inputRead(input);
+                    String inputMessage = new String(taskCode, StandardCharsets.UTF_8);
+                    Future<String> outputMessage;
+
+                    Callable callable = () -> {
+//                        Thread.sleep(2000);
+                        return serverLogic(fileTreeMap, server, inputMessage);
+                    };
+
+                    outputMessage = executor.submit(callable);
+                    sentRequest(outputMessage.get(), output);
+//                    sentRequest(serverLogic(input, output, fileTreeMap, server, inputMessage), output);
+
+
+                } catch (IOException | ClassNotFoundException | InterruptedException | ExecutionException e) {
+                    e.printStackTrace();
                 }
+//                catch (ClassNotFoundException e) {e.printStackTrace();}
+
             }
         } catch (IOException e) {
-//            e.printStackTrace();
-        } catch (ClassNotFoundException e) {
             e.printStackTrace();
         }
     }
-
-
 }
 

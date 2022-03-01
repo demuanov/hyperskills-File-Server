@@ -4,10 +4,11 @@ package client;
 import java.io.*;
 import java.net.InetAddress;
 import java.net.Socket;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Scanner;
 
 
@@ -15,10 +16,12 @@ public class Main implements Serializable {
     private static final String SERVER_ADDRESS = "127.0.0.1";
     private static final int SERVER_PORT = 23456;
 
-    public static String userPATH = System.getProperty("user.dir")  + File.separator + "File server" + File.separator + "task" +
-            File.separator + "src" + File.separator + "client" + File.separator + "data" + File.separator;
 
-    /**
+//        public static String testPath = File.separator + "File server" + File.separator + "task" + File.separator;
+    public static String testPath = File.separator;
+    public static String userPATH = System.getProperty("user.dir") + testPath + "src" + File.separator + "client" + File.separator + "data" + File.separator;
+
+  /**
      * Serialize the given object to the file
      */
     public static void serialize(Object obj, String fileName) throws IOException {
@@ -43,7 +46,7 @@ public class Main implements Serializable {
 
     public static String byNameOrID() {
         Scanner scanner = new Scanner(System.in);
-        String answer = "";
+        String answer = null;
         if (scanner.next().equals("1")) {
             System.out.println("Enter name of the file: ");
             answer = "BY_NAME " + scanner.next();
@@ -57,7 +60,8 @@ public class Main implements Serializable {
     }
 
 
-    public static void main(String[] args) throws ClassNotFoundException {
+    public static void main(String[] args) throws ClassNotFoundException, InterruptedException {
+    Thread.sleep(1000);
         System.out.println("Client started!");
         System.out.println("Enter action (1 - get a file, 2 - create a file, 3 - delete a file): ");
 
@@ -66,9 +70,9 @@ public class Main implements Serializable {
                 DataInputStream input = new DataInputStream(socket.getInputStream());
                 DataOutputStream output = new DataOutputStream(socket.getOutputStream());
                 Scanner sc = new Scanner(System.in)
-        ) {
 
-
+        ) {socket.setSoTimeout(100000*10000);
+//            socket.bind();
             String typeRequest = sc.nextLine();
             String answer = null;
 
@@ -78,48 +82,56 @@ public class Main implements Serializable {
                 answer = "GET ".concat(byNameOrID());
 
                 sentRequest(answer, output);
-
-                answer = null;
-
                 String response = inputRead(input);
 
                 if (response.contains("200")) {
+
+                    System.out.println("The file was downloaded! Specify a name for it: ");
+                    String newName = sc.nextLine();
                     String result = "";
                     try {
-                        result = response.substring(4);
+                        result = response.substring(4).trim();
                     } catch (IndexOutOfBoundsException e) {
                         result = "";
                     }
-                    System.out.println("The file was downloaded! Specify a name for it:  " + result);
+//                    File file = new File(userPATH + result );
+                    Path rename = Paths.get(userPATH + result);
+Files.move(rename, rename.resolveSibling(newName), StandardCopyOption.REPLACE_EXISTING);
+//                    System.out.println(file.renameTo(rename));
+                    //Написать перименовалку файла, в совтветсвии с пожеланием клиента
+
+
                 } else {
-                    System.out.println("The response says that the file was not found!");
+                    System.out.println("The response says that this file is not found!");
                 }
             }
 
             if (typeRequest.equals("2")) {
 
-                String nameOnServer = "NO_ID ";
+                String nameOnServer;
 
                 answer = "PUT ";
                 System.out.println("Enter name of the file: ");
                 String fileName = sc.nextLine();
-
                 System.out.println("Enter name of the file to be saved on server: ");
 
-                if (sc.hasNext()) {
-                    nameOnServer = sc.nextLine();
+                nameOnServer = sc.nextLine();
+
+                if ((nameOnServer.isEmpty())||(nameOnServer.equals("\n"))) {
+                    nameOnServer = "NO_ID";
                 }
 
                 answer = answer.concat(fileName + " ");
                 answer = answer.concat(nameOnServer + " ");
-
+//                System.out.println("Answer= " + answer);
                 sentRequest(answer, output);
                 answer = null;
 
                 String response = inputRead(input);
+//                System.out.println(response);
 
                 if (response.contains("200")) {
-                    System.out.println("The response says that the file was created!");
+                    System.out.println("Response says that file is saved! ID ="+ response.substring(3));
                 } else {
                     System.out.println("The response says that creating the file was forbidden!");
                 }
@@ -149,41 +161,19 @@ public class Main implements Serializable {
 
     }
 
-   /* private static void sentRequest(String answer, DataOutputStream output) throws IOException, ClassNotFoundException {
-        byte[] message = answer.getBytes(StandardCharsets.UTF_8);
-        String[] nameOfFile = answer.split(" ");
-        System.out.println(new String(message));
-        byte[] array = Files.readAllBytes(Paths.get(userPATH.concat(nameOfFile[1])));
-
-        System.out.println(new String(array));
-
-        byte[] result = ByteBuffer.allocate(message.length + array.length).put(message).put(array).array();
-
-        System.out.println(new String(result));
-
-//        serialize(message ,userPATH.concat("tmp_" + nameOfFile[1]));
-
-        output.writeInt(result.length);
-        output.write(result);
-
-    }
-*/
     private static void sentRequest(String answer, DataOutputStream output) throws IOException {
         byte[] message = answer.getBytes(StandardCharsets.UTF_8);
         output.writeInt(message.length);
         output.write(message);
 
-        System.out.println("The request was sent. > "+ answer);
+//        System.out.println("The request was sent. > "+ answer);
     }
 
     private static String inputRead(DataInputStream input) throws IOException {
         int length = input.readInt();
         byte[] message = new byte[length];
         input.readFully(message, 0, message.length);
-
-
-        String inputMessage = new String(message, StandardCharsets.UTF_8);
-        return inputMessage;
+        return new String(message, StandardCharsets.UTF_8);
     }
 
 
